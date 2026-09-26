@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Language {
+  es
+  ro
+}
+
+enum VerificationStatus {
+  unverified
+  ai_verified
+  source_verified
+}
+
+enum QuizType {
+  fill_blank
+  multiple_choice
+  flashcard
+  matching
+  spelling
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String?  @unique
+  isAnonymous  Boolean  @default(true)
+  themePref    String   @default("light")
+  createdAt    DateTime @default(now())
+
+  words         Word[]
+  quizProgress  QuizProgress[]
+  chatSessions  ChatSession[]
+}
+
+model Word {
+  id           String              @id @default(cuid())
+  text         String
+  language     Language
+  translation  String
+  meaning      String
+  partOfSpeech String?
+  gender       String?
+  examples     String[]            @default([])
+  status       VerificationStatus  @default(unverified)
+  source       String?
+  isCustom     Boolean             @default(false)
+  createdAt    DateTime            @default(now())
+
+  ownerId String?
+  owner   User?   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  quizProgress QuizProgress[]
+
+  @@index([text, language])
+  @@index([ownerId])
+}
+
+model QuizProgress {
+  id           String   @id @default(cuid())
+  quizType     QuizType
+  attempts     Int      @default(0)
+  successRate  Float    @default(0)
+  nextReviewAt DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  wordId String
+  word   Word   @relation(fields: [wordId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, wordId, quizType])
+}
+
+model ChatSession {
+  id        String   @id @default(cuid())
+  language  Language
+  messages  Json     @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}

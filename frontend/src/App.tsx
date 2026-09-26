@@ -1,0 +1,23 @@
+import { Routes, Route } from 'react-router-dom'
+import { AppShell } from './components/AppShell'
+import { HomeSearch } from './pages/HomeSearch'
+import { WordResult } from './pages/WordResult'
+import { MyDictionary } from './pages/MyDictionary'
+import { Quizzes } from './pages/Quizzes'
+import { Chat } from './pages/Chat'
+import { Profile } from './pages/Profile'
+
+export default function App() {
+  return (
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route path="/" element={<HomeSearch />} />
+        <Route path="/word/:term" element={<WordResult />} />
+        <Route path="/dictionary" element={<MyDictionary />} />
+        <Route path="/quizzes" element={<Quizzes />} />
+        <Route path="/chat" element={<Chat />} />
+        <Route path="/profile" element={<Profile />} />
+      </Route>
+    </Routes>
+  )
+}
