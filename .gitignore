@@ -7,3 +7,5 @@ build/
 .DS_Store
 frontend/dev-dist/
 backend/generated/
+backend/prisma/*.db
+backend/prisma/*.db-journal

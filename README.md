@@ -26,18 +26,23 @@ npm run dev
 ```bash
 cd backend
 npm install
-cp .env.example .env   # заполнить DATABASE_URL и ключи API
+cp .env.example .env        # локально можно оставить как есть (SQLite, без ключей)
+npx prisma migrate deploy   # создать/обновить локальную SQLite БД
 npm run dev
 ```
 
 Health-check: `http://localhost:4000/api/health`.
+
+Перевод слов работает из коробки (MyMemory API, без ключа). Без `ANTHROPIC_API_KEY` в `.env`
+значение и AI-верификация будут помечаться как «недоступны» — добавьте ключ с
+[console.anthropic.com](https://console.anthropic.com), чтобы включить это.
 
 ## Roadmap (этапы MVP)
 
 См. раздел 9 ТЗ. Прогресс отмечается в этом README по мере разработки.
 
 - [x] Этап 1 — Каркас: репозиторий, роутинг, светлая/тёмная тема, health-check
-- [ ] Этап 2 — Поиск и перевод слова
+- [x] Этап 2 — Поиск и перевод слова: MyMemory (перевод), Claude Haiku (AI-верификация + значение на румынском), SQLite-кэш
 - [ ] Этап 3 — Распознавание по фото (OCR)
 - [ ] Этап 4 — Личный словарь (CRUD)
 - [ ] Этап 5 — Квизы

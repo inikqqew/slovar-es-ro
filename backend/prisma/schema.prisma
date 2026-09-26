@@ -2,55 +2,44 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// SQLite для локальной разработки (Этап 2).
+// Для прод-деплоя сменить provider на "postgresql" и DATABASE_URL на Supabase/Neon —
+// тогда language/status/quizType можно вернуть на нативные enum, а examples на String[].
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
-enum Language {
-  es
-  ro
-}
-
-enum VerificationStatus {
-  unverified
-  ai_verified
-  source_verified
-}
-
-enum QuizType {
-  fill_blank
-  multiple_choice
-  flashcard
-  matching
-  spelling
-}
+// Допустимые значения (нет нативных enum в SQLite):
+// Language: "es" | "ro"
+// VerificationStatus: "unverified" | "ai_verified" | "source_verified"
+// QuizType: "fill_blank" | "multiple_choice" | "flashcard" | "matching" | "spelling"
 
 model User {
-  id           String   @id @default(cuid())
-  email        String?  @unique
-  isAnonymous  Boolean  @default(true)
-  themePref    String   @default("light")
-  createdAt    DateTime @default(now())
+  id          String   @id @default(cuid())
+  email       String?  @unique
+  isAnonymous Boolean  @default(true)
+  themePref   String   @default("light")
+  createdAt   DateTime @default(now())
 
-  words         Word[]
-  quizProgress  QuizProgress[]
-  chatSessions  ChatSession[]
+  words        Word[]
+  quizProgress QuizProgress[]
+  chatSessions ChatSession[]
 }
 
 model Word {
-  id           String              @id @default(cuid())
+  id           String   @id @default(cuid())
   text         String
-  language     Language
+  language     String
   translation  String
   meaning      String
   partOfSpeech String?
   gender       String?
-  examples     String[]            @default([])
-  status       VerificationStatus  @default(unverified)
+  examples     Json     @default("[]")
+  status       String   @default("unverified")
   source       String?
-  isCustom     Boolean             @default(false)
-  createdAt    DateTime            @default(now())
+  isCustom     Boolean  @default(false)
+  createdAt    DateTime @default(now())
 
   ownerId String?
   owner   User?   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -63,7 +52,7 @@ model Word {
 
 model QuizProgress {
   id           String   @id @default(cuid())
-  quizType     QuizType
+  quizType     String
   attempts     Int      @default(0)
   successRate  Float    @default(0)
   nextReviewAt DateTime @default(now())
@@ -80,7 +69,7 @@ model QuizProgress {
 
 model ChatSession {
   id        String   @id @default(cuid())
-  language  Language
+  language  String
   messages  Json     @default("[]")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
