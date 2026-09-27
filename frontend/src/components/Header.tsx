@@ -10,9 +10,21 @@ const TITLES: Record<string, string> = {
   '/ocr': 'Фото слова',
 }
 
+const QUIZ_MODE_TITLES: Record<string, string> = {
+  fill_blank: 'Вставь слово',
+  multiple_choice: 'Подбери перевод',
+  flashcard: 'Флеш-карты',
+  matching: 'Сопоставление',
+  spelling: 'Правописание',
+}
+
 function titleForPath(pathname: string): string {
   if (TITLES[pathname]) return TITLES[pathname]
   if (pathname.startsWith('/word/')) return 'Результат'
+  if (pathname.startsWith('/quizzes/')) {
+    const mode = pathname.split('/')[2]
+    return QUIZ_MODE_TITLES[mode] ?? 'Квиз'
+  }
   return 'Словарь'
 }
 
