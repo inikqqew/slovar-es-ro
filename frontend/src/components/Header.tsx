@@ -7,6 +7,7 @@ const TITLES: Record<string, string> = {
   '/quizzes': 'Квизы',
   '/chat': 'Чат-бот',
   '/profile': 'Профиль',
+  '/ocr': 'Фото слова',
 }
 
 function titleForPath(pathname: string): string {

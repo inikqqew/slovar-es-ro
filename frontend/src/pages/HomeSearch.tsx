@@ -16,8 +16,7 @@ export function HomeSearch() {
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    // Реализация OCR (Tesseract.js) — Этап 3
-    navigate('/word/ocr-pending', { state: { photoName: file.name } })
+    navigate('/ocr', { state: { file } })
   }
 
   return (
@@ -73,7 +72,7 @@ export function HomeSearch() {
       />
 
       <p className="mt-2 text-center text-sm text-gray-400">
-        Распознавание по фото (OCR) появится на Этапе 3.
+        Распознавание работает на испанском и румынском (OCR — офлайн, в браузере).
       </p>
     </div>
   )
