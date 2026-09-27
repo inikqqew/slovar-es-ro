@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { lookupWord, type WordLookupResult } from '../lib/api'
+import { lookupWord, saveWord, unsaveWord, type WordLookupResult } from '../lib/api'
 
 const LANG_LABEL: Record<string, string> = { es: 'Испанский', ro: 'Румынский' }
 
@@ -26,6 +26,7 @@ export function WordResult() {
   const [data, setData] = useState<WordLookupResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -70,6 +71,24 @@ export function WordResult() {
 
   const badge = STATUS_BADGE[data.status] ?? STATUS_BADGE.unverified
 
+  async function toggleSave() {
+    if (!data) return
+    setSaving(true)
+    try {
+      if (data.savedByMe) {
+        await unsaveWord(data.id)
+        setData({ ...data, savedByMe: false })
+      } else {
+        await saveWord(data.id)
+        setData({ ...data, savedByMe: true })
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось сохранить слово')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
@@ -113,11 +132,15 @@ export function WordResult() {
 
       <button
         type="button"
-        disabled
-        className="min-h-[44px] w-full rounded-xl border border-gray-300 bg-gray-100 py-3 text-base
-          font-medium text-gray-400 dark:border-gray-700 dark:bg-gray-800"
+        onClick={toggleSave}
+        disabled={saving}
+        className={`min-h-[44px] w-full rounded-xl py-3 text-base font-medium transition-colors disabled:opacity-60 ${
+          data.savedByMe
+            ? 'border border-green-300 bg-green-50 text-green-700 hover:bg-green-100 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300'
+            : 'bg-blue-600 text-white hover:bg-blue-700'
+        }`}
       >
-        Добавить в мой словарь (Этап 4)
+        {data.savedByMe ? '✓ В моём словаре (убрать)' : 'Добавить в мой словарь'}
       </button>
     </div>
   )

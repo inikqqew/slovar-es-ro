@@ -23,6 +23,7 @@ model User {
   createdAt   DateTime @default(now())
 
   words        Word[]
+  savedWords   SavedWord[]
   quizProgress QuizProgress[]
   chatSessions ChatSession[]
 }
@@ -45,9 +46,26 @@ model Word {
   owner   User?   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   quizProgress QuizProgress[]
+  savedBy      SavedWord[]
 
   @@index([text, language])
   @@index([ownerId])
+}
+
+// Слово из общего кэша (Этап 2), которое пользователь сохранил в свой словарь
+// без изменения самой записи — CRUD доступен только для isCustom-слов.
+model SavedWord {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  wordId String
+  word   Word   @relation(fields: [wordId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, wordId])
+  @@index([userId])
 }
 
 model QuizProgress {
