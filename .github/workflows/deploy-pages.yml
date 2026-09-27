@@ -28,6 +28,11 @@ jobs:
         working-directory: frontend
       - run: npm run build
         working-directory: frontend
+        env:
+          # Backend на Render (см. render.yaml). Если Render выдал другой поддомен
+          # (имя slovar-es-ro-backend уже занято) — поменять здесь И в Settings →
+          # Secrets and variables → Actions → Variables как VITE_API_BASE_URL.
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || 'https://slovar-es-ro-backend.onrender.com/api' }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

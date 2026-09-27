@@ -2,15 +2,17 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// SQLite для локальной разработки (Этап 2).
-// Для прод-деплоя сменить provider на "postgresql" и DATABASE_URL на Supabase/Neon —
-// тогда language/status/quizType можно вернуть на нативные enum, а examples на String[].
+// Postgres (Neon, бесплатный тир) — и локально, и в проде используется одна
+// и та же облачная база через DATABASE_URL, т.к. приложение и так требует
+// интернет (см. ТЗ 4.4/5.3). language/status/quizType хранятся как String,
+// а не нативные enum — Postgres это прекрасно поддерживает, но так схема
+// осталась идентичной прежней SQLite-версии без отдельной миграции полей.
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// Допустимые значения (нет нативных enum в SQLite):
+// Допустимые значения (String вместо enum — см. комментарий выше):
 // Language: "es" | "ro"
 // VerificationStatus: "unverified" | "ai_verified" | "source_verified"
 // QuizType: "fill_blank" | "multiple_choice" | "flashcard" | "matching" | "spelling"
