@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { compressImage, recognizeWords, type OcrWord } from '../lib/ocr'
+import { addToHistory } from '../lib/history'
 
 type Status = 'compressing' | 'recognizing' | 'done' | 'error'
 
@@ -112,7 +113,10 @@ export function OcrReview() {
               <button
                 key={w.text}
                 type="button"
-                onClick={() => navigate(`/word/${encodeURIComponent(w.text.toLowerCase())}`)}
+                onClick={() => {
+                  addToHistory(w.text)
+                  navigate(`/word/${encodeURIComponent(w.text.toLowerCase())}`)
+                }}
                 className="min-h-[44px] rounded-full border border-gray-300 bg-white px-4 py-2 text-base
                   font-medium text-gray-800 transition-colors hover:border-blue-500 hover:text-blue-600
                   dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:border-blue-400"

@@ -54,7 +54,7 @@ export function Chat() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-3">
+    <div className="flex h-[calc(100svh-13rem)] min-h-[320px] flex-col gap-3">
       <div className="flex gap-2">
         {(['es', 'ro'] as const).map((l) => (
           <button
@@ -86,7 +86,7 @@ export function Chat() {
 
       {!loading && !loadError && (
         <>
-          <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
+          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
             {messages.length === 0 && (
               <p className="py-8 text-center text-sm text-gray-400">
                 Напишите первое сообщение, чтобы начать практиковать {LANG_LABEL[language].toLowerCase()}.

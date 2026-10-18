@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { lookupWord, saveWord, unsaveWord, type WordLookupResult } from '../lib/api'
+import { canSpeak, speak } from '../lib/speech'
 
 const LANG_LABEL: Record<string, string> = { es: 'Испанский', ro: 'Румынский' }
 
@@ -95,7 +96,19 @@ export function WordResult() {
         <div className="flex items-start justify-between gap-2">
           <div>
             <p className="text-sm text-gray-400">{LANG_LABEL[data.language] ?? data.language}</p>
-            <p className="text-2xl font-semibold">{data.text}</p>
+            <div className="flex items-center gap-1">
+              <p className="text-2xl font-semibold">{data.text}</p>
+              {canSpeak() && (
+                <button
+                  type="button"
+                  onClick={() => speak(data.text, data.language)}
+                  aria-label="Произнести слово"
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-xl hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  🔊
+                </button>
+              )}
+            </div>
           </div>
           <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${badge.className}`}>
             {badge.label}

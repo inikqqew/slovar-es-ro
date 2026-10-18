@@ -1,8 +1,22 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { addToHistory, clearHistory, getHistory } from '../lib/history'
+import { fetchMyDictionary, type WordLookupResult } from '../lib/api'
 
 export function HomeSearch() {
   const [term, setTerm] = useState('')
+  const [history, setHistory] = useState<string[]>(getHistory)
+  const [wordOfDay, setWordOfDay] = useState<WordLookupResult | null>(null)
+
+  useEffect(() => {
+    fetchMyDictionary()
+      .then((words) => {
+        if (!words.length) return
+        const day = Math.floor(Date.now() / 86_400_000)
+        setWordOfDay(words[day % words.length])
+      })
+      .catch(() => {})
+  }, [])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
 
@@ -10,6 +24,7 @@ export function HomeSearch() {
     e.preventDefault()
     const trimmed = term.trim()
     if (!trimmed) return
+    addToHistory(trimmed)
     navigate(`/word/${encodeURIComponent(trimmed)}`)
   }
 
@@ -70,6 +85,49 @@ export function HomeSearch() {
         className="hidden"
         onChange={handlePhoto}
       />
+
+      {wordOfDay && (
+        <button
+          type="button"
+          onClick={() => navigate(`/word/${encodeURIComponent(wordOfDay.text)}`)}
+          className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-left dark:border-blue-900 dark:bg-blue-950"
+        >
+          <p className="text-xs font-medium text-blue-600 dark:text-blue-400">Слово дня</p>
+          <p className="text-xl font-semibold">{wordOfDay.text}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-300">{wordOfDay.translation}</p>
+        </button>
+      )}
+
+      {history.length > 0 && (
+        <section className="mt-2">
+          <div className="mb-2 flex items-center justify-between text-sm text-gray-400">
+            <span>Недавние запросы</span>
+            <button
+              type="button"
+              onClick={() => {
+                clearHistory()
+                setHistory([])
+              }}
+              className="min-h-[36px] px-2 text-blue-600 dark:text-blue-400"
+            >
+              Очистить
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {history.map((h) => (
+              <button
+                key={h}
+                type="button"
+                onClick={() => navigate(`/word/${encodeURIComponent(h)}`)}
+                className="min-h-[40px] rounded-full border border-gray-300 px-3 py-1.5 text-sm
+                  hover:border-blue-500 dark:border-gray-700"
+              >
+                {h}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       <p className="mt-2 text-center text-sm text-gray-400">
         Распознавание работает на испанском и румынском (OCR — офлайн, в браузере).
