@@ -1,10 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { compressImage, recognizePage, uniqueWords, type OcrLine } from '../lib/ocr'
+import {
+  fixLinesWithAi,
+  preprocessImage,
+  recognizePage,
+  uniqueWords,
+  type OcrLanguage,
+  type OcrLine,
+} from '../lib/ocr'
 import { lookupWord, saveWord } from '../lib/api'
 import { WordPanel } from '../components/WordPanel'
 
-type Status = 'compressing' | 'recognizing' | 'done' | 'error'
+type Status = 'preparing' | 'recognizing' | 'done' | 'error'
 
 interface BulkState {
   done: number
@@ -14,15 +21,27 @@ interface BulkState {
   running: boolean
 }
 
+const LANG_OPTIONS: { value: OcrLanguage; label: string }[] = [
+  { value: 'both', label: 'ES + RO' },
+  { value: 'es', label: 'Испанский' },
+  { value: 'ro', label: 'Румынский' },
+]
+
+const LOW_CONFIDENCE = 65
+
 export function OcrReview() {
   const location = useLocation() as { state?: { file?: File } }
   const navigate = useNavigate()
   const file = location.state?.file
 
+  const [rotation, setRotation] = useState(0)
+  const [language, setLanguage] = useState<OcrLanguage>('both')
   const [imageUrl, setImageUrl] = useState<string | null>(null)
-  const [status, setStatus] = useState<Status>('compressing')
+  const [status, setStatus] = useState<Status>('preparing')
   const [progress, setProgress] = useState(0)
   const [lines, setLines] = useState<OcrLine[]>([])
+  const [fixing, setFixing] = useState(false)
+  const [aiFixed, setAiFixed] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [bulk, setBulk] = useState<BulkState | null>(null)
@@ -36,23 +55,38 @@ export function OcrReview() {
 
     async function run() {
       try {
-        setStatus('compressing')
-        const compressed = await compressImage(file!)
+        setStatus('preparing')
+        setLines([])
+        setAiFixed(false)
+        setBulk(null)
+        setSelected(null)
+        const prepared = await preprocessImage(file!, rotation)
         if (cancelled) return
-        url = URL.createObjectURL(compressed)
+        url = URL.createObjectURL(prepared)
         setImageUrl(url)
 
         setStatus('recognizing')
-        const found = await recognizePage(compressed, (p) => {
+        setProgress(0)
+        const found = await recognizePage(prepared, language, (p) => {
           if (!cancelled) setProgress(p)
         })
         if (cancelled) return
         setLines(found)
         setStatus('done')
+
+        if (found.length > 0) {
+          setFixing(true)
+          const fixed = await fixLinesWithAi(found, language)
+          if (cancelled) return
+          setLines(fixed.lines)
+          setAiFixed(fixed.fixed)
+          setFixing(false)
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Не удалось распознать текст')
           setStatus('error')
+          setFixing(false)
         }
       }
     }
@@ -61,9 +95,10 @@ export function OcrReview() {
     return () => {
       cancelled = true
       cancelBulk.current = true
+      setFixing(false)
       if (url) URL.revokeObjectURL(url)
     }
-  }, [file])
+  }, [file, rotation, language])
 
   async function saveAll() {
     const words = uniqueWords(lines)
@@ -107,22 +142,55 @@ export function OcrReview() {
   }
 
   const total = uniqueWords(lines).length
+  const busy = status === 'preparing' || status === 'recognizing'
+  const hasLowConfidence = lines.some((l) => l.some((t) => t.word && t.conf < LOW_CONFIDENCE))
+  const confidences = lines.flatMap((l) => l.filter((t) => t.word).map((t) => t.conf))
+  const avgConfidence = confidences.length ? confidences.reduce((a, b) => a + b, 0) / confidences.length : 100
+  const looksSideways = status === 'done' && !fixing && lines.length > 0 && avgConfidence < 60
 
   return (
     <div className={`flex flex-col gap-4 ${selected ? 'pb-48' : ''}`}>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setRotation((r) => (r + 90) % 360)}
+          disabled={busy}
+          className="min-h-[40px] rounded-full border border-gray-300 px-3 text-sm font-medium disabled:opacity-50 dark:border-gray-700"
+        >
+          ⟳ Повернуть
+        </button>
+        {LANG_OPTIONS.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => setLanguage(o.value)}
+            disabled={busy}
+            className={`min-h-[40px] rounded-full px-3 text-sm font-medium transition-colors disabled:opacity-50 ${
+              language === o.value
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+
       {imageUrl && (
         <details className="rounded-xl border border-gray-200 dark:border-gray-800">
-          <summary className="cursor-pointer px-4 py-3 text-sm text-gray-500">Показать фото</summary>
-          <img src={imageUrl} alt="Загруженное фото" className="max-h-80 w-full object-contain p-2" />
+          <summary className="cursor-pointer px-4 py-3 text-sm text-gray-500">
+            Как приложение видит страницу (после обработки)
+          </summary>
+          <img src={imageUrl} alt="Обработанное фото" className="max-h-80 w-full object-contain p-2" />
         </details>
       )}
 
-      {(status === 'compressing' || status === 'recognizing') && (
+      {busy && (
         <div className="flex flex-col items-center gap-3 py-6 text-gray-400">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
           <p className="text-sm">
-            {status === 'compressing'
-              ? 'Обрабатываем фото…'
+            {status === 'preparing'
+              ? 'Улучшаем изображение…'
               : `Распознаём страницу… ${Math.round(progress * 100)}%`}
           </p>
           {status === 'recognizing' && (
@@ -150,13 +218,24 @@ export function OcrReview() {
         <>
           {lines.length === 0 ? (
             <p className="py-6 text-center text-sm text-gray-400">
-              Текст не распознан — сфотографируйте страницу ровнее и при хорошем освещении.
+              Текст не распознан. Попробуйте повернуть страницу, выбрать язык или сфотографировать ровнее
+              при хорошем освещении.
             </p>
           ) : (
             <>
               <p className="text-sm text-gray-400">
-                Нажмите на любое слово на странице, чтобы увидеть перевод. Слов: {total}.
+                Нажмите на слово, чтобы увидеть перевод. Слов: {total}.
+                {fixing && ' Проверяем ошибки распознавания…'}
+                {aiFixed && ' Ошибки распознавания исправлены ИИ.'}
+                {hasLowConfidence && !fixing && ' Жёлтым подчёркнуты слова, в которых распознавание не уверено.'}
               </p>
+
+              {looksSideways && (
+                <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+                  Текст распознан неуверенно. Если страница снята боком или вверх ногами — нажмите «⟳ Повернуть»;
+                  также можно выбрать язык страницы вместо «ES + RO».
+                </div>
+              )}
 
               <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
                 {lines.map((line, i) => (
@@ -170,7 +249,11 @@ export function OcrReview() {
                           className={`rounded px-0.5 text-left transition-colors ${
                             selected?.toLowerCase() === t.word.toLowerCase()
                               ? 'bg-blue-600 text-white'
-                              : 'underline decoration-gray-300 decoration-dotted underline-offset-4 hover:bg-blue-50 dark:decoration-gray-600 dark:hover:bg-blue-950'
+                              : `underline decoration-dotted underline-offset-4 hover:bg-blue-50 dark:hover:bg-blue-950 ${
+                                  t.conf < LOW_CONFIDENCE
+                                    ? 'decoration-amber-500'
+                                    : 'decoration-gray-300 dark:decoration-gray-600'
+                                }`
                           }`}
                         >
                           {t.raw}
@@ -190,7 +273,7 @@ export function OcrReview() {
                   <button
                     type="button"
                     onClick={saveAll}
-                    disabled={total === 0}
+                    disabled={total === 0 || fixing}
                     className="min-h-[48px] rounded-xl bg-blue-600 font-medium text-white hover:bg-blue-700 disabled:opacity-60"
                   >
                     Сохранить все слова страницы в словарь ({total})
