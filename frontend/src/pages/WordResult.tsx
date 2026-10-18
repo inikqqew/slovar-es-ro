@@ -29,10 +29,10 @@ export function WordResult() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  const load = useCallback(() => {
+  const load = useCallback((forceLang?: 'es' | 'ro') => {
     setLoading(true)
     setError(null)
-    lookupWord(decoded)
+    lookupWord(decoded, forceLang)
       .then(setData)
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false))
@@ -59,7 +59,7 @@ export function WordResult() {
         <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
         <button
           type="button"
-          onClick={load}
+          onClick={() => load()}
           className="min-h-[44px] rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
           Повторить
@@ -144,6 +144,14 @@ export function WordResult() {
           </div>
         )}
       </div>
+
+      <button
+        type="button"
+        onClick={() => load(data.language === 'es' ? 'ro' : 'es')}
+        className="min-h-[40px] self-center text-sm text-gray-400 underline underline-offset-4"
+      >
+        Язык определён неверно? Это {data.language === 'es' ? 'румынское' : 'испанское'} слово
+      </button>
 
       <button
         type="button"

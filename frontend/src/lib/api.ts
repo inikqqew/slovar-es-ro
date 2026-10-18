@@ -44,8 +44,9 @@ export interface WordLookupResult {
   savedByMe: boolean
 }
 
-export async function lookupWord(text: string): Promise<WordLookupResult> {
-  const res = await fetch(`${API_BASE}/words/lookup?text=${encodeURIComponent(text)}`, {
+export async function lookupWord(text: string, lang?: WordLanguage): Promise<WordLookupResult> {
+  const langParam = lang ? `&lang=${lang}` : ''
+  const res = await fetch(`${API_BASE}/words/lookup?text=${encodeURIComponent(text)}${langParam}`, {
     headers: authHeaders(),
   })
   return parseErrorOr(res)

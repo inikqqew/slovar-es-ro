@@ -10,7 +10,7 @@ export interface LlmMessage {
 }
 
 const DEFAULT_BASE_URL = 'https://api.groq.com/openai/v1'
-const DEFAULT_MODEL = 'llama-3.3-70b-versatile'
+const DEFAULT_MODEL = 'openai/gpt-oss-120b'
 
 export function isLlmConfigured(): boolean {
   return Boolean(process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY)
@@ -25,23 +25,34 @@ export async function llmComplete(params: {
 
   if (process.env.LLM_API_KEY) {
     const base = (process.env.LLM_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, '')
+    const model = process.env.LLM_MODEL || DEFAULT_MODEL
+    const reasoning = model.includes('gpt-oss')
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 30_000)
     try {
-      const res = await fetch(`${base}/chat/completions`, {
+      const doFetch = () => fetch(`${base}/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${process.env.LLM_API_KEY}`,
         },
         body: JSON.stringify({
-          model: process.env.LLM_MODEL || DEFAULT_MODEL,
-          max_tokens: maxTokens,
+          model,
+          // у reasoning-моделей (gpt-oss) «размышления» тоже считаются в лимит токенов
+          max_tokens: reasoning ? maxTokens * 4 : maxTokens,
           temperature: 0.4,
+          ...(reasoning ? { reasoning_effort: 'low' } : {}),
           messages: [{ role: 'system', content: system }, ...messages],
         }),
         signal: controller.signal,
       })
+      let res = await doFetch()
+      // бесплатные тарифы ограничивают число запросов в минуту — один повтор с паузой
+      if (res.status === 429) {
+        const wait = Math.min(Number(res.headers.get('retry-after')) || 3, 8)
+        await new Promise((r) => setTimeout(r, wait * 1000))
+        res = await doFetch()
+      }
       if (!res.ok) {
         throw new Error(`LLM ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`)
       }

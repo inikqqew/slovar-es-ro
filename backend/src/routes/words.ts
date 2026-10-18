@@ -15,7 +15,9 @@ wordsRouter.get('/lookup', optionalAnonUser, async (req, res) => {
   const text = raw.trim().toLowerCase()
 
   try {
-    const language = await detectLanguage(text)
+    // ?lang=es|ro — ручное переопределение, если авто-определение ошиблось
+    const forced = req.query.lang
+    const language = forced === 'es' || forced === 'ro' ? forced : await detectLanguage(text)
 
     let word = await prisma.word.findFirst({
       where: { text, language, isCustom: false },
