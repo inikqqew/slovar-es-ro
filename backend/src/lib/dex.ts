@@ -51,6 +51,7 @@ export function parseDexDefinition(internalRep: string): DexResult | null {
     .split(' * ')[0] // дальше идут идиомы/выражения
     .replace(/[@$#]/g, '')
     .replace(/\s+/g, ' ')
+    .trim()
     .replace(/^și\s+[mfn]\.\s*/i, '') // "s. m. și f." — вторая часть рода
     .replace(/^([IVX]+\.\s*)?(\d+\.\s*)?/, '') // номера значений
     .split(/\s\*\*\s|\s\[/)[0] // доп. значения, произношение и этимология

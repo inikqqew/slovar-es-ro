@@ -1,6 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
-
-const client = process.env.ANTHROPIC_API_KEY ? new Anthropic() : null
+import { isLlmConfigured, llmComplete, type LlmMessage } from './llm.js'
 
 const LANG_NAMES: Record<'es' | 'ro', string> = { es: 'испанском', ro: 'румынском' }
 
@@ -14,28 +12,16 @@ function systemPrompt(language: 'es' | 'ro'): string {
 - Пиши коротко (2-4 предложения), это переписка, а не лекция.`
 }
 
-export interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
-}
+export type ChatMessage = LlmMessage
 
-export async function generateReply(
-  language: 'es' | 'ro',
-  history: ChatMessage[],
-): Promise<string> {
-  if (!client) {
-    return 'Чат-бот недоступен: не настроен ANTHROPIC_API_KEY на сервере. Добавьте ключ в backend/.env, чтобы включить эту функцию.'
+export async function generateReply(language: 'es' | 'ro', history: ChatMessage[]): Promise<string> {
+  if (!isLlmConfigured()) {
+    return 'Чат-бот недоступен: не задан ключ LLM. Впишите LLM_API_KEY (бесплатный ключ Groq или Google Gemini) в backend/.env и перезапустите сервер.'
   }
-
-  const recentHistory = history.slice(-20)
-
-  const message = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 400,
+  const reply = await llmComplete({
     system: systemPrompt(language),
-    messages: recentHistory.map((m) => ({ role: m.role, content: m.content })),
+    messages: history.slice(-20),
+    maxTokens: 400,
   })
-
-  const textBlock = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text')
-  return textBlock?.text ?? '…'
+  return reply || '…'
 }
