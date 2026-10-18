@@ -65,8 +65,8 @@ export function MyDictionary() {
   async function handleAddSubmit(e: React.FormEvent) {
     e.preventDefault()
     setFormError(null)
-    if (!form.text.trim() || !form.translation.trim() || !form.meaning.trim()) {
-      setFormError('Слово, перевод и значение обязательны')
+    if (!form.text.trim() || !form.translation.trim()) {
+      setFormError('Введите слово и перевод')
       return
     }
     setSubmitting(true)
@@ -164,7 +164,7 @@ export function MyDictionary() {
           <div className="flex gap-2">
             <input
               type="text"
-              placeholder="Слово"
+              placeholder="Слово *"
               value={form.text}
               onChange={(e) => setForm({ ...form, text: e.target.value })}
               className="h-11 flex-1 rounded-lg border border-gray-300 bg-white px-3 dark:border-gray-700 dark:bg-gray-950"
@@ -180,13 +180,13 @@ export function MyDictionary() {
           </div>
           <input
             type="text"
-            placeholder="Перевод"
+            placeholder="Перевод *"
             value={form.translation}
             onChange={(e) => setForm({ ...form, translation: e.target.value })}
             className="h-11 rounded-lg border border-gray-300 bg-white px-3 dark:border-gray-700 dark:bg-gray-950"
           />
           <textarea
-            placeholder="Значение (на румынском)"
+            placeholder="Значение на румынском (необязательно — подставим из словаря)"
             value={form.meaning}
             onChange={(e) => setForm({ ...form, meaning: e.target.value })}
             rows={2}
@@ -268,7 +268,7 @@ export function MyDictionary() {
                   <textarea
                     value={editDraft.meaning}
                     onChange={(e) => setEditDraft({ ...editDraft, meaning: e.target.value })}
-                    placeholder="Значение"
+                    placeholder="Значение (необязательно)"
                     rows={2}
                     className="rounded-lg border border-gray-300 px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
                   />

@@ -71,7 +71,7 @@ export interface NewWordInput {
   text: string
   language: WordLanguage
   translation: string
-  meaning: string
+  meaning?: string
   example?: string
 }
 

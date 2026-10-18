@@ -1,6 +1,7 @@
 import { createWorker } from 'tesseract.js'
 
-const MAX_DIMENSION = 1600 // снижает время OCR и нагрузку на память на телефоне
+// Страница целиком — нужна более высокая детализация, чем для одного слова
+const MAX_DIMENSION = 2400
 
 export async function compressImage(file: File): Promise<Blob> {
   const bitmap = await createImageBitmap(file)
@@ -20,20 +21,27 @@ export async function compressImage(file: File): Promise<Blob> {
     canvas.toBlob(
       (blob) => (blob ? resolve(blob) : reject(new Error('Не удалось сжать изображение'))),
       'image/jpeg',
-      0.85,
+      0.9,
     )
   })
 }
 
-export interface OcrWord {
-  text: string
-  confidence: number
+export interface OcrToken {
+  raw: string // как на странице (с пунктуацией)
+  word: string | null // очищенное слово для перевода, null — не слово (число, знак)
 }
 
-export async function recognizeWords(
+export type OcrLine = OcrToken[]
+
+function clean(raw: string): string | null {
+  const w = raw.trim().replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '')
+  return w.length >= 2 && /^[\p{L}'’-]+$/u.test(w) ? w : null
+}
+
+export async function recognizePage(
   image: Blob,
   onProgress?: (progress: number) => void,
-): Promise<OcrWord[]> {
+): Promise<OcrLine[]> {
   const worker = await createWorker(['spa', 'ron'], undefined, {
     logger: (m) => {
       if (m.status === 'recognizing text' && onProgress) onProgress(m.progress)
@@ -45,22 +53,31 @@ export async function recognizeWords(
       data: { blocks },
     } = await worker.recognize(image, {}, { blocks: true })
 
-    const allWords = (blocks ?? []).flatMap((block) =>
-      block.paragraphs.flatMap((p) => p.lines.flatMap((line) => line.words)),
-    )
-
-    const seen = new Set<string>()
-    const result: OcrWord[] = []
-    for (const w of allWords) {
-      const clean = w.text.trim().replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '')
-      if (clean.length < 2) continue
-      const key = clean.toLowerCase()
-      if (seen.has(key)) continue
-      seen.add(key)
-      result.push({ text: clean, confidence: w.confidence })
+    const lines: OcrLine[] = []
+    for (const block of blocks ?? []) {
+      for (const paragraph of block.paragraphs) {
+        for (const line of paragraph.lines) {
+          const tokens = line.words
+            .map((w) => w.text.trim())
+            .filter(Boolean)
+            .map((raw) => ({ raw, word: clean(raw) }))
+          if (tokens.length) lines.push(tokens)
+        }
+      }
     }
-    return result
+    return lines
   } finally {
     await worker.terminate()
   }
+}
+
+// Уникальные слова страницы для массового сохранения (короткие служебные пропускаем)
+export function uniqueWords(lines: OcrLine[], minLength = 3): string[] {
+  const seen = new Set<string>()
+  for (const line of lines) {
+    for (const t of line) {
+      if (t.word && t.word.length >= minLength) seen.add(t.word.toLowerCase())
+    }
+  }
+  return [...seen]
 }

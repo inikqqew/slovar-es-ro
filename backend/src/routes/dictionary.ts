@@ -51,12 +51,11 @@ dictionaryRouter.post('/words', async (req, res) => {
     !text.trim() ||
     (language !== 'es' && language !== 'ro') ||
     typeof translation !== 'string' ||
-    !translation.trim() ||
-    typeof meaning !== 'string' ||
-    !meaning.trim()
+    !translation.trim()
   ) {
-    return res.status(400).json({ error: 'text, language (es/ro), translation и meaning обязательны' })
+    return res.status(400).json({ error: 'Обязательны только слово, язык и перевод' })
   }
+  const userMeaning = typeof meaning === 'string' ? meaning.trim() : ''
 
   const [analysis, dex] = await Promise.all([
     analyzeWord({
@@ -72,7 +71,10 @@ dictionaryRouter.post('/words', async (req, res) => {
       text: text.trim().toLowerCase(),
       language,
       translation: translation.trim(),
-      meaning: meaning.trim(),
+      // значение не обязательно: если не задано — подтягиваем из DEX/AI
+      meaning: userMeaning || dex?.meaning || analysis?.meaningRo || '',
+      partOfSpeech: dex?.partOfSpeech ?? analysis?.partOfSpeech ?? null,
+      gender: dex?.gender ?? analysis?.gender ?? null,
       examples: example && typeof example === 'string' ? [example.trim()] : [],
       status: dex ? 'source_verified' : analysis?.verified ? 'ai_verified' : 'unverified',
       source: dex ? 'dexonline' : analysis ? 'ai' : 'user',
@@ -96,7 +98,7 @@ dictionaryRouter.patch('/words/:id', async (req, res) => {
   const { translation, meaning, example } = req.body ?? {}
   const data: Record<string, unknown> = {}
   if (typeof translation === 'string' && translation.trim()) data.translation = translation.trim()
-  if (typeof meaning === 'string' && meaning.trim()) data.meaning = meaning.trim()
+  if (typeof meaning === 'string') data.meaning = meaning.trim()
   if (typeof example === 'string') data.examples = example.trim() ? [example.trim()] : []
 
   const updated = await prisma.word.update({ where: { id }, data })

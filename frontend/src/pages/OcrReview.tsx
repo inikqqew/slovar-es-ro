@@ -1,9 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { compressImage, recognizeWords, type OcrWord } from '../lib/ocr'
-import { addToHistory } from '../lib/history'
+import { compressImage, recognizePage, uniqueWords, type OcrLine } from '../lib/ocr'
+import { lookupWord, saveWord } from '../lib/api'
+import { WordPanel } from '../components/WordPanel'
 
 type Status = 'compressing' | 'recognizing' | 'done' | 'error'
+
+interface BulkState {
+  done: number
+  total: number
+  saved: number
+  failed: number
+  running: boolean
+}
 
 export function OcrReview() {
   const location = useLocation() as { state?: { file?: File } }
@@ -13,8 +22,11 @@ export function OcrReview() {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [status, setStatus] = useState<Status>('compressing')
   const [progress, setProgress] = useState(0)
-  const [words, setWords] = useState<OcrWord[]>([])
+  const [lines, setLines] = useState<OcrLine[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(null)
+  const [bulk, setBulk] = useState<BulkState | null>(null)
+  const cancelBulk = useRef(false)
 
   useEffect(() => {
     if (!file) return
@@ -31,11 +43,11 @@ export function OcrReview() {
         setImageUrl(url)
 
         setStatus('recognizing')
-        const found = await recognizeWords(compressed, (p) => {
+        const found = await recognizePage(compressed, (p) => {
           if (!cancelled) setProgress(p)
         })
         if (cancelled) return
-        setWords(found)
+        setLines(found)
         setStatus('done')
       } catch (err) {
         if (!cancelled) {
@@ -48,9 +60,36 @@ export function OcrReview() {
 
     return () => {
       cancelled = true
+      cancelBulk.current = true
       if (url) URL.revokeObjectURL(url)
     }
   }, [file])
+
+  async function saveAll() {
+    const words = uniqueWords(lines)
+    if (!words.length) return
+    cancelBulk.current = false
+    const state: BulkState = { done: 0, total: words.length, saved: 0, failed: 0, running: true }
+    setBulk({ ...state })
+
+    const queue = [...words]
+    async function worker() {
+      while (queue.length && !cancelBulk.current) {
+        const w = queue.shift()!
+        try {
+          const found = await lookupWord(w)
+          if (!found.savedByMe) await saveWord(found.id)
+          state.saved++
+        } catch {
+          state.failed++
+        }
+        state.done++
+        setBulk({ ...state })
+      }
+    }
+    await Promise.all([worker(), worker(), worker()])
+    setBulk({ ...state, running: false })
+  }
 
   if (!file) {
     return (
@@ -67,14 +106,15 @@ export function OcrReview() {
     )
   }
 
+  const total = uniqueWords(lines).length
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className={`flex flex-col gap-4 ${selected ? 'pb-48' : ''}`}>
       {imageUrl && (
-        <img
-          src={imageUrl}
-          alt="Загруженное фото"
-          className="max-h-64 w-full rounded-xl border border-gray-200 object-contain dark:border-gray-800"
-        />
+        <details className="rounded-xl border border-gray-200 dark:border-gray-800">
+          <summary className="cursor-pointer px-4 py-3 text-sm text-gray-500">Показать фото</summary>
+          <img src={imageUrl} alt="Загруженное фото" className="max-h-80 w-full object-contain p-2" />
+        </details>
       )}
 
       {(status === 'compressing' || status === 'recognizing') && (
@@ -83,8 +123,13 @@ export function OcrReview() {
           <p className="text-sm">
             {status === 'compressing'
               ? 'Обрабатываем фото…'
-              : `Распознаём текст… ${Math.round(progress * 100)}%`}
+              : `Распознаём страницу… ${Math.round(progress * 100)}%`}
           </p>
+          {status === 'recognizing' && (
+            <div className="h-1.5 w-48 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
+              <div className="h-full bg-blue-600 transition-all" style={{ width: `${progress * 100}%` }} />
+            </div>
+          )}
         </div>
       )}
 
@@ -102,31 +147,94 @@ export function OcrReview() {
       )}
 
       {status === 'done' && (
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-gray-400">
-            {words.length > 0
-              ? 'Нажмите на слово, чтобы посмотреть перевод:'
-              : 'Слов не распознано — попробуйте более чёткое фото.'}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {words.map((w) => (
-              <button
-                key={w.text}
-                type="button"
-                onClick={() => {
-                  addToHistory(w.text)
-                  navigate(`/word/${encodeURIComponent(w.text.toLowerCase())}`)
-                }}
-                className="min-h-[44px] rounded-full border border-gray-300 bg-white px-4 py-2 text-base
-                  font-medium text-gray-800 transition-colors hover:border-blue-500 hover:text-blue-600
-                  dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:border-blue-400"
-              >
-                {w.text}
-              </button>
-            ))}
-          </div>
-        </div>
+        <>
+          {lines.length === 0 ? (
+            <p className="py-6 text-center text-sm text-gray-400">
+              Текст не распознан — сфотографируйте страницу ровнее и при хорошем освещении.
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-gray-400">
+                Нажмите на любое слово на странице, чтобы увидеть перевод. Слов: {total}.
+              </p>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                {lines.map((line, i) => (
+                  <p key={i} className="flex flex-wrap gap-x-1.5 text-base leading-9">
+                    {line.map((t, j) =>
+                      t.word ? (
+                        <button
+                          key={j}
+                          type="button"
+                          onClick={() => setSelected(t.word)}
+                          className={`rounded px-0.5 text-left transition-colors ${
+                            selected?.toLowerCase() === t.word.toLowerCase()
+                              ? 'bg-blue-600 text-white'
+                              : 'underline decoration-gray-300 decoration-dotted underline-offset-4 hover:bg-blue-50 dark:decoration-gray-600 dark:hover:bg-blue-950'
+                          }`}
+                        >
+                          {t.raw}
+                        </button>
+                      ) : (
+                        <span key={j} className="text-gray-400">
+                          {t.raw}
+                        </span>
+                      ),
+                    )}
+                  </p>
+                ))}
+              </div>
+
+              <div className="flex flex-col gap-2 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+                {!bulk && (
+                  <button
+                    type="button"
+                    onClick={saveAll}
+                    disabled={total === 0}
+                    className="min-h-[48px] rounded-xl bg-blue-600 font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                  >
+                    Сохранить все слова страницы в словарь ({total})
+                  </button>
+                )}
+                {bulk && (
+                  <>
+                    <div className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
+                      <div
+                        className="h-full bg-green-500 transition-all"
+                        style={{ width: `${(bulk.done / bulk.total) * 100}%` }}
+                      />
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {bulk.running ? 'Переводим и сохраняем… ' : 'Готово. '}
+                      {bulk.done}/{bulk.total} · сохранено {bulk.saved}
+                      {bulk.failed > 0 && ` · не удалось ${bulk.failed}`}
+                    </p>
+                    {bulk.running ? (
+                      <button
+                        type="button"
+                        onClick={() => (cancelBulk.current = true)}
+                        className="min-h-[44px] rounded-xl border border-gray-300 text-sm font-medium dark:border-gray-700"
+                      >
+                        Остановить
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => navigate('/dictionary')}
+                        className="min-h-[44px] rounded-xl bg-blue-600 text-sm font-medium text-white"
+                      >
+                        Открыть мой словарь
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </>
+          )}
+        </>
       )}
+
+      {selected && <WordPanel term={selected} onClose={() => setSelected(null)} />}
     </div>
   )
 }

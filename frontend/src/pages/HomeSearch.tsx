@@ -18,6 +18,7 @@ export function HomeSearch() {
       .catch(() => {})
   }, [])
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
 
   function handleSubmit(e: React.FormEvent) {
@@ -68,15 +69,26 @@ export function HomeSearch() {
         <div className="h-px flex-1 bg-gray-200 dark:bg-gray-800" />
       </div>
 
-      <button
-        type="button"
-        onClick={() => fileInputRef.current?.click()}
-        className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border
-          border-gray-300 bg-white py-3 text-base font-medium text-gray-700 transition-colors
-          hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
-      >
-        <span aria-hidden="true">📷</span> Сфотографировать слово
-      </button>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl border
+            border-gray-300 bg-white py-3 text-base font-medium text-gray-700 transition-colors
+            hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+        >
+          <span aria-hidden="true">📷</span> Фото страницы
+        </button>
+        <button
+          type="button"
+          onClick={() => galleryInputRef.current?.click()}
+          className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-gray-300
+            bg-white px-4 py-3 text-base font-medium text-gray-700 transition-colors hover:bg-gray-50
+            dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+        >
+          <span aria-hidden="true">🖼️</span> Из галереи
+        </button>
+      </div>
       <input
         ref={fileInputRef}
         type="file"
@@ -85,6 +97,7 @@ export function HomeSearch() {
         className="hidden"
         onChange={handlePhoto}
       />
+      <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
 
       {wordOfDay && (
         <button
@@ -130,7 +143,7 @@ export function HomeSearch() {
       )}
 
       <p className="mt-2 text-center text-sm text-gray-400">
-        Распознавание работает на испанском и румынском (OCR — офлайн, в браузере).
+        Сфотографируйте страницу книги или текста — распознаем все слова (испанский и румынский).
       </p>
     </div>
   )

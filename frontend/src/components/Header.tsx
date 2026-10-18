@@ -7,7 +7,7 @@ const TITLES: Record<string, string> = {
   '/quizzes': 'Квизы',
   '/chat': 'Чат-бот',
   '/profile': 'Профиль',
-  '/ocr': 'Фото слова',
+  '/ocr': 'Фото страницы',
 }
 
 const QUIZ_MODE_TITLES: Record<string, string> = {

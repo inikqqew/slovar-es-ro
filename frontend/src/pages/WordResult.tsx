@@ -126,10 +126,12 @@ export function WordResult() {
           </p>
         )}
 
-        <div className="mt-3 border-t border-gray-100 pt-3 dark:border-gray-800">
-          <p className="text-sm text-gray-400">Значение (rom.)</p>
-          <p className="text-base">{data.meaning}</p>
-        </div>
+        {data.meaning && (
+          <div className="mt-3 border-t border-gray-100 pt-3 dark:border-gray-800">
+            <p className="text-sm text-gray-400">Значение (rom.)</p>
+            <p className="text-base">{data.meaning}</p>
+          </div>
+        )}
 
         {data.examples.length > 0 && (
           <div className="mt-3 border-t border-gray-100 pt-3 dark:border-gray-800">

@@ -24,7 +24,7 @@ export function Spelling({
       <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <p className="text-sm text-gray-400">Напишите слово, соответствующее переводу</p>
         <p className="mt-2 text-2xl font-semibold">{word.translation}</p>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{word.meaning}</p>
+        {word.meaning && <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{word.meaning}</p>}
       </div>
 
       <form onSubmit={handleSubmit} className="flex w-full max-w-sm flex-col gap-3">
