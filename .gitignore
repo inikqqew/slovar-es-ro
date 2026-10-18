@@ -10,3 +10,5 @@ backend/generated/
 backend/prisma/*.db
 backend/prisma/*.db-journal
 .claude/scheduled_tasks.lock
+
+backend/.pgdata/

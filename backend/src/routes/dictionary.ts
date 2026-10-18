@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { prisma } from '../lib/prisma.js'
 import { requireAnonUser } from '../lib/anonUser.js'
 import { analyzeWord } from '../lib/wordAnalysis.js'
+import { fetchDex } from '../lib/dex.js'
 import type { SupportedLanguage } from '../lib/translate.js'
 
 export const dictionaryRouter = Router()
@@ -57,11 +58,14 @@ dictionaryRouter.post('/words', async (req, res) => {
     return res.status(400).json({ error: 'text, language (es/ro), translation и meaning обязательны' })
   }
 
-  const analysis = await analyzeWord({
-    text: text.trim(),
-    language: language as SupportedLanguage,
-    translation: translation.trim(),
-  })
+  const [analysis, dex] = await Promise.all([
+    analyzeWord({
+      text: text.trim(),
+      language: language as SupportedLanguage,
+      translation: translation.trim(),
+    }),
+    fetchDex((language === 'ro' ? text : translation).trim().toLowerCase()),
+  ])
 
   const word = await prisma.word.create({
     data: {
@@ -70,8 +74,8 @@ dictionaryRouter.post('/words', async (req, res) => {
       translation: translation.trim(),
       meaning: meaning.trim(),
       examples: example && typeof example === 'string' ? [example.trim()] : [],
-      status: analysis ? (analysis.verified ? 'ai_verified' : 'unverified') : 'unverified',
-      source: analysis ? 'ai' : 'user',
+      status: dex ? 'source_verified' : analysis?.verified ? 'ai_verified' : 'unverified',
+      source: dex ? 'dexonline' : analysis ? 'ai' : 'user',
       isCustom: true,
       ownerId: userId,
     },

@@ -10,6 +10,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push",
+    "local": "node scripts/local.mjs",
     "render-start": "prisma db push --skip-generate && npm run start"
   },
   "dependencies": {
@@ -17,7 +18,9 @@
     "@prisma/client": "^6.2.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "express": "^4.21.2"
+    "embedded-postgres": "^18.4.0-beta.17",
+    "express": "^4.21.2",
+    "express-async-errors": "^3.1.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
@@ -34,6 +37,7 @@
     "@prisma/client@6.19.3": true,
     "@prisma/engines@6.19.3": true,
     "esbuild@0.28.2": true,
-    "prisma@6.19.3": true
+    "prisma@6.19.3": true,
+    "@embedded-postgres/windows-x64@18.4.0-beta.17": true
   }
 }

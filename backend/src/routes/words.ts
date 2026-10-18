@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { prisma } from '../lib/prisma.js'
 import { detectLanguage, otherLanguage, translateText } from '../lib/translate.js'
 import { analyzeWord } from '../lib/wordAnalysis.js'
+import { fetchDex } from '../lib/dex.js'
 import { optionalAnonUser } from '../lib/anonUser.js'
 
 export const wordsRouter = Router()
@@ -34,19 +35,25 @@ wordsRouter.get('/lookup', optionalAnonUser, async (req, res) => {
         })
       }
 
-      const analysis = await analyzeWord({ text, language, translation })
+      // Значение всегда на румынском: для румынского слова — его статья в DEX,
+      // для испанского — статья DEX его румынского перевода.
+      const [dex, analysis] = await Promise.all([
+        fetchDex(language === 'ro' ? text : translation.toLowerCase()),
+        analyzeWord({ text, language, translation }),
+      ])
 
+      const verifiedByAi = Boolean(analysis?.verified)
       word = await prisma.word.create({
         data: {
           text,
           language,
           translation,
-          meaning: analysis?.meaningRo ?? 'Значение уточняется — AI-верификация недоступна.',
-          partOfSpeech: analysis?.partOfSpeech ?? null,
-          gender: analysis?.gender ?? null,
+          meaning: dex?.meaning ?? analysis?.meaningRo ?? 'Значение не найдено в словаре DEX.',
+          partOfSpeech: dex?.partOfSpeech ?? analysis?.partOfSpeech ?? null,
+          gender: dex?.gender ?? analysis?.gender ?? null,
           examples: analysis?.examples ?? [],
-          status: analysis ? (analysis.verified ? 'ai_verified' : 'unverified') : 'unverified',
-          source: analysis ? 'ai' : null,
+          status: dex ? 'source_verified' : verifiedByAi ? 'ai_verified' : 'unverified',
+          source: dex ? 'dexonline' : analysis ? 'ai' : null,
           isCustom: false,
         },
       })

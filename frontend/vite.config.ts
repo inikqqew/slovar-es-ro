@@ -8,7 +8,7 @@ const GH_PAGES_BASE = '/slovar-es-ro/'
 
 // https://vite.dev/config/
 export default defineConfig(({ command }) => ({
-  base: command === 'build' ? GH_PAGES_BASE : '/',
+  base: command === 'build' ? (process.env.VITE_BASE ?? GH_PAGES_BASE) : '/',
   plugins: [
     react(),
     tailwindcss(),
