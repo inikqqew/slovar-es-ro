@@ -11,6 +11,7 @@ import { dictionaryRouter } from './routes/dictionary.js'
 import { quizzesRouter } from './routes/quizzes.js'
 import { chatRouter } from './routes/chat.js'
 import { ocrRouter } from './routes/ocr.js'
+import { profileRouter } from './routes/profile.js'
 
 const app = express()
 const PORT = process.env.PORT ?? 4000
@@ -24,6 +25,7 @@ app.use('/api/dictionary', dictionaryRouter)
 app.use('/api/quizzes', quizzesRouter)
 app.use('/api/chat', chatRouter)
 app.use('/api/ocr', ocrRouter)
+app.use('/api/profile', profileRouter)
 
 // Локальный/самостоятельный деплой: тот же процесс отдаёт собранный фронтенд.
 const frontendDir = process.env.SERVE_FRONTEND_DIR

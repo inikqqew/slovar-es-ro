@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { fetchHealth, fetchMyDictionary, type WordLookupResult } from '../lib/api'
 import { fetchQuizProgress, type QuizProgress, type QuizType } from '../lib/quiz'
 import { useTheme } from '../theme/ThemeContext'
+import { TransferProfile } from '../components/TransferProfile'
 
 type ServerStatus = 'checking' | 'online' | 'offline'
 
@@ -131,6 +132,11 @@ export function Profile() {
             </ul>
           </>
         )}
+      </section>
+
+      <section className={card}>
+        <h2 className={h2}>Перенос на другое устройство</h2>
+        <TransferProfile />
       </section>
 
       <section className={card}>

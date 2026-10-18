@@ -123,3 +123,32 @@ export async function unsaveWord(wordId: string): Promise<void> {
   })
   return parseErrorOr(res)
 }
+
+export type BulkAction = 'delete' | 'set_language' | 'refresh_meaning'
+
+export async function bulkWords(
+  ids: string[],
+  action: BulkAction,
+  language?: WordLanguage,
+): Promise<{ affected: number; skipped: number }> {
+  const res = await fetch(`${API_BASE}/dictionary/bulk`, {
+    method: 'POST',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids, action, language }),
+  })
+  return parseErrorOr(res)
+}
+
+export async function createTransferCode(): Promise<{ code: string; expiresAt: string }> {
+  const res = await fetch(`${API_BASE}/profile/transfer-code`, { method: 'POST', headers: authHeaders() })
+  return parseErrorOr(res)
+}
+
+export async function redeemTransferCode(code: string): Promise<{ userId: string }> {
+  const res = await fetch(`${API_BASE}/profile/redeem`, {
+    method: 'POST',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  })
+  return parseErrorOr(res)
+}

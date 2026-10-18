@@ -141,3 +141,54 @@ dictionaryRouter.delete('/save/:wordId', async (req, res) => {
     .catch(() => null)
   res.status(204).end()
 })
+
+// POST /api/dictionary/bulk — пакетные действия над выбранными словами.
+// action: delete (свои — удалить, сохранённые — убрать из словаря),
+//         set_language (только свои слова), refresh_meaning (значение заново из DEX).
+dictionaryRouter.post('/bulk', async (req, res) => {
+  const userId = req.userId!
+  const { ids, action, language } = req.body ?? {}
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 500 || ids.some((i) => typeof i !== 'string')) {
+    return res.status(400).json({ error: 'ids — непустой массив (до 500 слов)' })
+  }
+  if (!['delete', 'set_language', 'refresh_meaning'].includes(action)) {
+    return res.status(400).json({ error: 'Неизвестное действие' })
+  }
+  if (action === 'set_language' && language !== 'es' && language !== 'ro') {
+    return res.status(400).json({ error: 'language должен быть es или ro' })
+  }
+
+  const own = await prisma.word.findMany({ where: { id: { in: ids }, ownerId: userId, isCustom: true } })
+  const ownIds = own.map((w) => w.id)
+  let affected = 0
+
+  if (action === 'delete') {
+    affected += (await prisma.word.deleteMany({ where: { id: { in: ownIds } } })).count
+    affected += (await prisma.savedWord.deleteMany({ where: { userId, wordId: { in: ids } } })).count
+  } else if (action === 'set_language') {
+    affected = (await prisma.word.updateMany({ where: { id: { in: ownIds } }, data: { language } })).count
+  } else {
+    const queue = [...own]
+    const worker = async () => {
+      while (queue.length) {
+        const w = queue.shift()!
+        const dex = await fetchDex((w.language === 'ro' ? w.text : w.translation).trim().toLowerCase())
+        if (!dex) continue
+        await prisma.word.update({
+          where: { id: w.id },
+          data: {
+            meaning: dex.meaning,
+            partOfSpeech: dex.partOfSpeech ?? w.partOfSpeech,
+            gender: dex.gender ?? w.gender,
+            status: 'source_verified',
+            source: 'dexonline',
+          },
+        })
+        affected++
+      }
+    }
+    await Promise.all([worker(), worker(), worker()])
+  }
+
+  res.json({ affected, skipped: ids.length - affected })
+})

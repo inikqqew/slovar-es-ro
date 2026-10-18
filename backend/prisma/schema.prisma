@@ -25,9 +25,22 @@ model User {
   createdAt   DateTime @default(now())
 
   words        Word[]
-  savedWords   SavedWord[]
-  quizProgress QuizProgress[]
-  chatSessions ChatSession[]
+  savedWords    SavedWord[]
+  quizProgress  QuizProgress[]
+  chatSessions  ChatSession[]
+  transferCodes TransferCode[]
+}
+
+// Одноразовый код переноса профиля на другое устройство (живёт несколько минут)
+model TransferCode {
+  code      String   @id
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Word {

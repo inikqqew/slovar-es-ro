@@ -19,3 +19,7 @@ export function getUserId(): string {
   }
   return id
 }
+
+export function setUserId(id: string): void {
+  localStorage.setItem(STORAGE_KEY, id)
+}

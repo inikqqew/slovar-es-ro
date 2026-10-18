@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  bulkWords,
   addCustomWord,
   deleteCustomWord,
   fetchMyDictionary,
   unsaveWord,
   updateCustomWord,
+  type BulkAction,
   type WordLanguage,
   type WordLookupResult,
 } from '../lib/api'
@@ -45,6 +47,11 @@ export function MyDictionary() {
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkNote, setBulkNote] = useState<string | null>(null)
+
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState({ translation: '', meaning: '', example: '' })
 
@@ -82,6 +89,45 @@ export function MyDictionary() {
     }
   }
 
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function exitSelectMode() {
+    setSelectMode(false)
+    setSelectedIds(new Set())
+    setBulkNote(null)
+  }
+
+  async function runBulk(action: BulkAction, language?: WordLanguage) {
+    const ids = [...selectedIds]
+    if (!ids.length) return
+    if (action === 'delete' && !confirm(`Удалить выбранные слова (${ids.length})?`)) return
+    setBulkBusy(true)
+    setBulkNote(null)
+    try {
+      const r = await bulkWords(ids, action, language)
+      if (action === 'delete') {
+        exitSelectMode()
+      } else {
+        setBulkNote(
+          `Изменено: ${r.affected}` +
+            (r.skipped > 0 ? ` · пропущено ${r.skipped} (изменять можно только свои слова / слова не найдены в DEX)` : ''),
+        )
+      }
+      load()
+    } catch (err) {
+      setBulkNote(err instanceof Error ? err.message : 'Не удалось выполнить действие')
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
   async function handleDelete(id: string) {
     setItems((prev) => prev.filter((w) => w.id !== id))
     try {
@@ -116,7 +162,7 @@ export function MyDictionary() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={`flex flex-col gap-4 ${selectMode ? 'pb-44' : ''}`}>
       <div className="flex gap-2">
         {(['all', 'es', 'ro'] as const).map((l) => (
           <button
@@ -132,6 +178,17 @@ export function MyDictionary() {
             {l === 'all' ? 'Все' : l.toUpperCase()}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+          className={`ml-auto min-h-[36px] rounded-full border px-3 py-1 text-sm font-medium ${
+            selectMode
+              ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+              : 'border-gray-300 text-gray-600 dark:border-gray-700 dark:text-gray-300'
+          }`}
+        >
+          {selectMode ? 'Готово' : 'Выбрать'}
+        </button>
       </div>
 
       <input
@@ -297,9 +354,18 @@ export function MyDictionary() {
                 </div>
               ) : (
                 <div className="flex items-start justify-between gap-2">
+                  {selectMode && (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(w.id)}
+                      onChange={() => toggleSelected(w.id)}
+                      aria-label={`Выбрать ${w.text}`}
+                      className="mt-1 h-5 w-5 shrink-0 accent-blue-600"
+                    />
+                  )}
                   <button
                     type="button"
-                    onClick={() => navigate(`/word/${encodeURIComponent(w.text)}`)}
+                    onClick={() => (selectMode ? toggleSelected(w.id) : navigate(`/word/${encodeURIComponent(w.text)}`))}
                     className="flex-1 text-left"
                   >
                     <div className="flex items-center gap-2">
@@ -313,7 +379,7 @@ export function MyDictionary() {
                     </div>
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{w.translation}</p>
                   </button>
-                  <div className="flex shrink-0 gap-1">
+                  <div className={`flex shrink-0 gap-1 ${selectMode ? 'hidden' : ''}`}>
                     {w.isCustom ? (
                       <>
                         <button
@@ -350,6 +416,63 @@ export function MyDictionary() {
           )
         })}
       </ul>
+
+      {selectMode && (
+        <div
+          className="fixed inset-x-0 z-20 mx-auto max-w-2xl px-3"
+          style={{ bottom: 'calc(64px + env(safe-area-inset-bottom))' }}
+        >
+          <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+            <div className="mb-2 flex items-center justify-between text-sm">
+              <span className="font-medium">Выбрано: {selectedIds.size}</span>
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedIds(selectedIds.size === items.length ? new Set() : new Set(items.map((w) => w.id)))
+                }
+                className="min-h-[36px] px-2 text-blue-600 dark:text-blue-400"
+              >
+                {selectedIds.size === items.length ? 'Снять выбор' : 'Выбрать все'}
+              </button>
+            </div>
+            {bulkNote && <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">{bulkNote}</p>}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={!selectedIds.size || bulkBusy}
+                onClick={() => runBulk('delete')}
+                className="min-h-[40px] rounded-lg bg-red-600 px-3 text-sm font-medium text-white disabled:opacity-50"
+              >
+                Удалить
+              </button>
+              <button
+                type="button"
+                disabled={!selectedIds.size || bulkBusy}
+                onClick={() => runBulk('set_language', 'es')}
+                className="min-h-[40px] rounded-lg border border-gray-300 px-3 text-sm disabled:opacity-50 dark:border-gray-700"
+              >
+                Язык → ES
+              </button>
+              <button
+                type="button"
+                disabled={!selectedIds.size || bulkBusy}
+                onClick={() => runBulk('set_language', 'ro')}
+                className="min-h-[40px] rounded-lg border border-gray-300 px-3 text-sm disabled:opacity-50 dark:border-gray-700"
+              >
+                Язык → RO
+              </button>
+              <button
+                type="button"
+                disabled={!selectedIds.size || bulkBusy}
+                onClick={() => runBulk('refresh_meaning')}
+                className="min-h-[40px] rounded-lg border border-gray-300 px-3 text-sm disabled:opacity-50 dark:border-gray-700"
+              >
+                Обновить значения
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

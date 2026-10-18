@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { fetchChatSession, sendChatMessage, type ChatLanguage, type ChatMessage } from '../lib/chat'
+import { startVoice, voiceSupported, type VoiceSession } from '../lib/voice'
+import { canSpeak, speak } from '../lib/speech'
 
 const LANG_LABEL: Record<ChatLanguage, string> = { es: 'Испанский', ro: 'Румынский' }
 
@@ -15,6 +17,26 @@ export function Chat() {
   const [sendError, setSendError] = useState<string | null>(null)
 
   const bottomRef = useRef<HTMLDivElement>(null)
+  const voiceRef = useRef<VoiceSession | null>(null)
+  const [listening, setListening] = useState(false)
+
+  function toggleVoice() {
+    if (listening) {
+      voiceRef.current?.stop()
+      return
+    }
+    setSendError(null)
+    const baseText = input ? input.trimEnd() + ' ' : ''
+    voiceRef.current = startVoice(language, {
+      onText: (text) => setInput(baseText + text),
+      onError: (msg) => setSendError(msg),
+      onEnd: () => setListening(false),
+    })
+    setListening(voiceRef.current !== null)
+  }
+
+  useEffect(() => () => voiceRef.current?.stop(), [])
+  useEffect(() => voiceRef.current?.stop(), [language])
 
   useEffect(() => {
     setLoading(true)
@@ -102,6 +124,16 @@ export function Chat() {
                 }`}
               >
                 {m.content}
+                {m.role === 'assistant' && canSpeak() && (
+                  <button
+                    type="button"
+                    onClick={() => speak(m.content.split('\n')[0], language)}
+                    aria-label="Озвучить ответ"
+                    className="ml-2 align-middle text-base opacity-70 hover:opacity-100"
+                  >
+                    🔊
+                  </button>
+                )}
               </div>
             ))}
             {sending && (
@@ -126,6 +158,21 @@ export function Chat() {
                 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:opacity-70
                 dark:border-gray-700 dark:bg-gray-900 dark:focus:border-blue-400 dark:focus:ring-blue-900"
             />
+            {voiceSupported() && (
+              <button
+                type="button"
+                onClick={toggleVoice}
+                disabled={sending}
+                aria-label={listening ? 'Остановить запись' : 'Голосовой ввод'}
+                className={`min-h-[44px] min-w-[48px] rounded-xl border text-xl transition-colors ${
+                  listening
+                    ? 'animate-pulse border-red-500 bg-red-50 text-red-600 dark:bg-red-950'
+                    : 'border-gray-300 dark:border-gray-700'
+                }`}
+              >
+                🎤
+              </button>
+            )}
             <button
               type="submit"
               disabled={sending || !input.trim()}
